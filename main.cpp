@@ -175,11 +175,12 @@ int main(int argc, char *argv[]) {
     }
 
     try {
+        std::vector<std::thread> threads;
         // connection
         auto connQueue = std::make_shared<ConcurrentQueue<std::vector<std::uint8_t>>>();
         std::exception_ptr mConnException;
         std::atomic<bool> isConnectionFinished = false;
-        std::thread connThread([hostName, port, connQueue, &mConnException, &isConnectionFinished]() {
+        threads.emplace_back([hostName, port, connQueue, &mConnException, &isConnectionFinished]() {
             Log() << "start connection thread" << std::endl;
             TcpConnection connection;
             try {
@@ -194,7 +195,7 @@ int main(int argc, char *argv[]) {
         // parsing
         std::atomic<bool> isParserFinished = false;
         auto cmdQueue = std::make_shared<ConcurrentQueue<std::shared_ptr<Cmd>>>();
-        std::thread parserThread([&isConnectionFinished, &isParserFinished, connQueue, cmdQueue]() {
+        threads.emplace_back([&isConnectionFinished, &isParserFinished, connQueue, cmdQueue]() {
             Log() << "start cmd parser" << std::endl;
             TlvCmdParser parser;
             while (!isConnectionFinished.load(std::memory_order_relaxed) || !connQueue->isEmpty()) {
@@ -207,7 +208,7 @@ int main(int argc, char *argv[]) {
             Log() << "finish cmd parser" << std::endl;
         });
         // consuming
-        std::thread flashlightThread([&isParserFinished, cmdQueue] {
+        threads.emplace_back([&isParserFinished, cmdQueue] {
             Log() << "start flashlight thread" << std::endl;
             while (!isParserFinished.load(std::memory_order_relaxed) || !cmdQueue->isEmpty()) {
                 if (const auto result = cmdQueue->waitAndPop(); result.has_value()) {
@@ -238,10 +239,9 @@ int main(int argc, char *argv[]) {
             Log() << "finish flashlight thread" << std::endl;
         });
 
-        connThread.join();
-        parserThread.join();
-        flashlightThread.join();
-
+        for (auto &thread : threads) {
+            thread.join();
+        }
         if (mConnException != nullptr) {
             std::rethrow_exception(mConnException);
         }
