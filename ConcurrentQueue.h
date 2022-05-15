@@ -17,7 +17,7 @@ public:
 
     void push(T &&value) {
         {
-            std::unique_lock lock(mMutex);
+            std::lock_guard lock(mMutex);
             mQueue.push(value);
             mIsInterrupted = false;
         }
@@ -44,7 +44,7 @@ public:
 
     void interruptWaiting() {
         {
-            std::unique_lock lock(mMutex);
+            std::lock_guard lock(mMutex);
             if (mIsInterrupted) {
                 return;
             }
