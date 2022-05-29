@@ -130,11 +130,10 @@ private:
 
     template<typename CmdType>
     std::shared_ptr<CmdType> parseCmd(std::vector<std::uint8_t>::const_iterator &it,
-                                      const std::int64_t leftByte,
+                                      const std::int64_t leftBytes,
                                       std::function<std::shared_ptr<CmdType>(
                                               const std::vector<std::uint8_t> &payload)> factory) {
-        if (auto payload = extractPayload(it, leftByte);
-                payload.has_value()) {
+        if (auto payload = extractPayload(it, leftBytes); payload.has_value()) {
             return factory(*payload);
         }
         return {};
@@ -144,12 +143,12 @@ private:
     extractPayload(std::vector<std::uint8_t>::const_iterator &it, const std::int64_t leftBytes) {
         if (leftBytes > static_cast<std::int64_t>(BYTES_OF_HEADER)) {
             std::array<std::uint8_t, BYTES_OF_LENGTH> lengthData = {};
-            std::copy_n(it + BYTES_OF_TYPE, BYTES_OF_LENGTH, std::begin(lengthData));
+            std::copy_n(it + BYTES_OF_TYPE, lengthData.size(), std::begin(lengthData));
             // from big-endian to little-endian
             std::reverse(std::begin(lengthData), std::end(lengthData));
             const auto payloadLength = *reinterpret_cast<std::uint16_t *>(lengthData.data());
-            const auto leftPayloadBytes = std::distance(it + BYTES_OF_HEADER, it + leftBytes);
-            if (leftPayloadBytes >= payloadLength) {
+            const auto leftBytesForPayload = leftBytes - BYTES_OF_HEADER;
+            if (leftBytesForPayload >= payloadLength) {
                 it += BYTES_OF_HEADER;
                 std::vector<std::uint8_t> payload(it, it + payloadLength);
                 it += payloadLength - 1;
